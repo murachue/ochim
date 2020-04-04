@@ -1,0 +1,81 @@
+name: build the ROM
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - r*
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: build for emu
+        run: |
+          cat Dockerfile | docker build -t ochimbuilder -
+          docker run --rm -v $PWD:/build -w /build ochimbuilder bash -c 'make EMU=1 clean all ochim.debug'
+          cp ochim.z64 ochim_emu.z64
+          zip rom_emu.zip ochim_emu.z64 README.md LICENSE
+          zip debug_emu.zip ochim.debug ochim.elf.map
+      - name: upload ROM for emu as an artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: rom_emu
+          path: rom_emu.zip
+      - name: upload debug files for emu as an artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: debug_emu
+          path: debug_emu.zip
+      - name: build for real console
+        run: |
+          cat Dockerfile | docker build -t ochimbuilder -
+          docker run --rm -v $PWD:/build -w /build ochimbuilder bash -c 'make EMU=0 clean all ochim.debug'
+          zip rom.zip ochim.z64 README.md LICENSE
+          zip debug.zip ochim.debug ochim.elf.map
+      - name: upload ROM for real console as an artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: rom
+          path: rom.zip
+      - name: upload debug files for real console as an artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: debug
+          path: debug.zip
+      - name: get slug of tag
+        id: tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: echo ::set-output name=slug::${GITHUB_REF#refs/tags/}
+      - name: create a release on tag
+        id: create-release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{github.ref}}
+          release_name: ${{steps.tag.outputs.slug}}
+          draft: true
+      - name: attach the ROM for real console to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{steps.create-release.outputs.upload_url}}
+          asset_path: rom.zip
+          asset_name: ochim_${{steps.tag.outputs.slug}}.zip
+          asset_content_type: application/octet-stream
+      - name: attach the ROM for emu to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{steps.create-release.outputs.upload_url}}
+          asset_path: rom_emu.zip
+          asset_name: ochim_${{steps.tag.outputs.slug}}_emu.zip
+          asset_content_type: application/octet-stream
