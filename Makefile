@@ -41,8 +41,8 @@ CFLAGS ?= $(COMMONFLAGS) -std=gnu99 -ffunction-sections -fdata-sections -G0 -ggd
 ASFLAGS ?= $(COMMONFLAGS) -g
 RSPASFLAGS ?= -g -mips1 -mrsp
 LDFLAGS ?= -Wl,--gc-sections $(LDFLAGS_DEBUG)
-# TODO: ROM must be larger than 4+1024K (1M for IPL3)... want smaller.
-ROMSIZE = 512K
+# ROM must be larger than 2M
+ROMSIZE = 2M
 
 STUBOBJS = gdbstub.o gdbstubl.o
 
